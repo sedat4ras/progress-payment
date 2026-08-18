@@ -1,0 +1,52 @@
+<section class="strip">
+
+  <div class="slot">
+    <div class="slot-label">Why work is stuck</div>
+    {% if metrics.exceptions %}
+      <ul class="bars">
+        {% for code, label, count in metrics.exceptions[:5] %}
+          <li>
+            <a class="bar-row" href="/?flag={{ code }}">
+              <span class="bar-name">{{ label }}</span>
+              <span class="bar-track">
+                <span class="bar-fill" style="width: {{ (count / metrics.exception_peak * 100)|round }}%"></span>
+              </span>
+              <span class="bar-count">{{ count }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="slot-empty">Nothing is flagged.</p>
+    {% endif %}
+  </div>
+
+  <div class="slot">
+    <div class="slot-label">Automation rate</div>
+    <div class="gauge">
+      <svg viewBox="0 0 80 80" width="80" height="80" aria-hidden="true">
+        <circle class="gauge-track" cx="40" cy="40" r="34"></circle>
+        <circle class="gauge-fill" cx="40" cy="40" r="34"
+                stroke-dasharray="{{ (metrics.automation_rate * 213.6)|round(1) }} 213.6"></circle>
+      </svg>
+      <div class="gauge-value">{{ metrics.automation_rate|pct }}<span class="unit">%</span></div>
+    </div>
+    <p class="slot-note">of lines priced with no human touch</p>
+  </div>
+
+  <div class="slot">
+    <div class="slot-label">Silent errors</div>
+    <div class="hero {% if metrics.silent_errors %}hero-alarm{% endif %}">{{ metrics.silent_errors }}</div>
+    <p class="slot-note">in {{ metrics.priced_lines }} automatically priced lines</p>
+    {% if metrics.cross_category_errors %}
+      <p class="slot-note alarm">{{ metrics.cross_category_errors }} crossed material and labour</p>
+    {% endif %}
+  </div>
+
+  <div class="slot">
+    <div class="slot-label">Value pending</div>
+    <div class="hero"><span class="unit">{{ currency }}</span>{{ metrics.value_pending|money }}</div>
+    <p class="slot-note">confirmed and at stake, everything unapproved</p>
+  </div>
+
+</section>

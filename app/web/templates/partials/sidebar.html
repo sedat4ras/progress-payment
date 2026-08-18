@@ -1,0 +1,40 @@
+<aside class="sidebar">
+  <a class="brand" href="/">3P</a>
+
+  <nav class="nav">
+    <a class="nav-item" href="/">
+      <span>Pipeline</span>
+      <span class="count">{{ sidebar.in_flight }}</span>
+    </a>
+    <a class="nav-item" href="/invalid">
+      <span>Invalid</span>
+      {% if sidebar.invalid %}<span class="count alarm">{{ sidebar.invalid }}</span>{% endif %}
+    </a>
+    <a class="nav-item" href="/approved">
+      <span>Approved</span>
+      <span class="count">{{ sidebar.approved }}</span>
+    </a>
+  </nav>
+
+  <div class="nav-section">Customers</div>
+  <nav class="nav">
+    {% for code, name, backlog in sidebar.customers %}
+      <a class="nav-item" href="/?customer={{ code }}">
+        <span>{{ name }}</span>
+        {% if backlog %}<span class="count">{{ backlog }}</span>{% endif %}
+      </a>
+    {% endfor %}
+  </nav>
+
+  {% if sidebar.degraded_backend %}
+    <p class="notice">
+      The <strong>{{ sidebar.degraded_backend }}</strong> matcher is unreachable.
+      Slips are still being processed by the deterministic layers.
+    </p>
+  {% endif %}
+
+  <div class="signed-in">
+    <div class="who">{{ reviewer }}</div>
+    <div class="role">{{ reviewer_title }}</div>
+  </div>
+</aside>

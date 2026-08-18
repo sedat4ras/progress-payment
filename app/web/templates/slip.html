@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ draft.slip.slip_no }} — 3P{% endblock %}
+
+{% macro resolve_form(line, label) %}
+  <form class="resolve" method="post" action="/lines/{{ line.id }}/resolve">
+    <select name="item_code" data-quantity="{{ line.quantity }}" required>
+      <option value="" disabled selected>Choose a contract item…</option>
+      {% for item in catalogue %}
+        <option value="{{ item.code }}" data-price="{{ item.unit_price }}">
+          {{ item.code }} · {{ item.description }} · {{ item.category.value }} ·
+          {{ currency }} {{ item.unit_price|money }}/{{ item.unit }}
+        </option>
+      {% endfor %}
+      <option value="__not_billable__" data-price="">Not billable</option>
+    </select>
+    <output class="preview" hidden></output>
+    <button type="submit">{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{% macro manual_form(line) %}
+  <form class="manual" method="post" action="/lines/{{ line.id }}/manual-price">
+    <input type="text" name="description" placeholder="What was done" required>
+    <input type="number" name="unit_price" step="0.01" min="0" placeholder="Unit price" required>
+    <button type="submit">Price it manually</button>
+  </form>
+{% endmacro %}
+
+{% block main %}
+<header class="page-head">
+  <h1>{{ draft.slip.slip_no }}</h1>
+  <span class="tag tag-{{ draft.status.value }}">{{ draft.status|status }}</span>
+  <a class="pill" href="/">← Pipeline</a>
+</header>
+
+{% if error %}<p class="notice">{{ error }}</p>{% endif %}
+
+<section class="panel slip-head">
+  <dl class="pairs">
+    <dt>Customer</dt><dd>{{ card.customer }}</dd>
+    <dt>Contract</dt><dd>{{ card.contract_code or 'none in force' }}</dd>
+    <dt>Service date</dt><dd>{{ draft.slip.service_date|day }}</dd>
+    <dt>Technician</dt><dd>{{ draft.slip.technician }}</dd>
+    <dt>Work type</dt><dd>{{ draft.slip.work_type.value }}</dd>
+    <dt>Confirmed</dt><dd class="amount">{{ currency }} {{ draft.total_gross|money }}</dd>
+    {% if draft.pending_net %}
+      <dt>At stake</dt><dd class="amount">{{ currency }} {{ draft.pending_net|money }}</dd>
+    {% endif %}
+  </dl>
+  {% if draft.slip.site_note %}<p class="site-note">{{ draft.slip.site_note }}</p>{% endif %}
+  {% if draft.takeover_reason %}
+    <p class="site-note">
+      Taken over by {{ draft.taken_over_by }} — {{ draft.takeover_reason.value|replace('_', ' ') }}.
+      {{ draft.takeover_note or '' }}
+    </p>
+  {% endif %}
+</section>
+
+{% if draft.status.value == 'invalid' %}
+  <section class="panel">
+    <h2 class="panel-title">Why this slip never entered the pipeline</h2>
+    <ul class="reasons">
+      {% for flag in draft.flags %}<li>{{ flag.message }}</li>{% endfor %}
+    </ul>
+    <form method="post" action="/slips/{{ draft.id }}/reprocess">
+      <button type="submit" class="primary">Reprocess</button>
+    </form>
+  </section>
+{% else %}
+
+<section class="lines">
+  {% for view in lines %}
+    {% set line = view.line %}
+    <article class="line line-{{ view.kind }}">
+
+      <div class="line-head">
+        <span class="line-no">{{ line.slip_line.line_no }}</span>
+        <span class="raw">{{ line.slip_line.raw_description }}</span>
+        <span class="qty">{{ line.quantity|round(2) }} {{ line.slip_line.unit }}</span>
+        {% if view.kind != 'priced' %}
+          <span class="tag tag-line-{{ view.kind }}">
+            {{ view.flag_label if view.kind == 'flagged' else view.kind }}
+          </span>
+        {% endif %}
+      </div>
+
+      {% if view.kind == 'flagged' %}
+        <p class="line-message">{{ view.flag_message }}</p>
+        {{ resolve_form(line, 'Resolve') }}
+        {% if draft.status.value == 'manual' %}{{ manual_form(line) }}{% endif %}
+
+      {% elif view.kind == 'corrected' %}
+        <div class="readings">
+          <div class="reading was">
+            <span class="which">was</span>
+            <span class="item">{{ line.proposed_item.code if line.proposed_item else '—' }}
+              {{ line.proposed_item.description if line.proposed_item else 'no match' }}</span>
+            <span class="method">{{ (line.proposed_confidence * 100)|round|int }}% ·
+              {{ line.proposed_method.value }}</span>
+          </div>
+          <div class="reading now">
+            <span class="which">now</span>
+            <span class="item">{{ line.contract_item.code ~ ' ' ~ line.contract_item.description
+              if line.contract_item else 'not billable' }}</span>
+            <span class="amount">{{ currency }} {{ line.line_net|money }}</span>
+            <span class="method">corrected by {{ line.corrected_by }}</span>
+          </div>
+        </div>
+        <details class="amend">
+          <summary>Change again</summary>
+          {{ resolve_form(line, 'Apply') }}
+          {% if draft.status.value == 'manual' %}{{ manual_form(line) }}{% endif %}
+        </details>
+
+      {% elif view.kind == 'manual' %}
+        <div class="line-body">
+          <span class="item">{{ line.manual_description }}</span>
+          <span class="method">priced by a reviewer</span>
+          <span class="amount">{{ currency }} {{ line.line_net|money }}</span>
+        </div>
+        <details class="amend"><summary>Change</summary>{{ manual_form(line) }}</details>
+
+      {% else %}
+        <div class="line-body">
+          <span class="item">{{ line.contract_item.code }} {{ line.contract_item.description }}</span>
+          <span class="method">{{ (line.confidence * 100)|round|int }}% ·
+            {{ line.match_method.value }}</span>
+          <span class="arith">{{ line.quantity|round(2) }} × {{ line.unit_price|money }}</span>
+          <span class="amount">{{ currency }} {{ line.line_net|money }}</span>
+        </div>
+        <details class="amend">
+          <summary>Correct</summary>
+          {{ resolve_form(line, 'Apply') }}
+          {% if draft.status.value == 'manual' %}{{ manual_form(line) }}{% endif %}
+        </details>
+      {% endif %}
+
+    </article>
+  {% endfor %}
+</section>
+
+<footer class="panel approve-bar">
+  <dl class="totals">
+    <dt>Net</dt><dd class="amount">{{ currency }} {{ draft.total_net|money }}</dd>
+    <dt>GST</dt><dd class="amount">{{ currency }} {{ draft.total_gst|money }}</dd>
+    <dt>Total</dt><dd class="amount total">{{ currency }} {{ draft.total_gross|money }}</dd>
+  </dl>
+
+  <div class="actions">
+    {% if blocking_reason %}
+      <p class="blocked">{{ blocking_reason }}</p>
+    {% endif %}
+
+    {% if draft.status.value == 'ready' %}
+      <details class="takeover">
+        <summary>Take it over</summary>
+        <form method="post" action="/slips/{{ draft.id }}/take-over">
+          <select name="reason" required>
+            {% for reason in takeover_reasons %}
+              <option value="{{ reason.value }}">{{ reason.value|replace('_', ' ') }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="note" placeholder="Note (optional)">
+          <button type="submit">Take over</button>
+        </form>
+      </details>
+    {% endif %}
+
+    <form method="post" action="/slips/{{ draft.id }}/reprocess">
+      <button type="submit" class="secondary">Reprocess</button>
+    </form>
+
+    <form method="post" action="/slips/{{ draft.id }}/approve">
+      <button type="submit" class="primary" {{ 'disabled' if blocking_reason }}>Approve</button>
+    </form>
+  </div>
+</footer>
+
+{% endif %}
+{% endblock %}

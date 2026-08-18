@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Pipeline — 3P{% endblock %}
+
+{% set empty_line = {
+  'needs_review': 'Slips the engine could not settle on its own.',
+  'ready': 'Slips priced end to end, waiting for a signature.',
+  'manual': 'Slips a reviewer has taken over.',
+  'approved': 'Signed-off progress payments.'
+} %}
+
+{% macro keep(extra) -%}
+  {%- set parts = [] -%}
+  {%- if customer %}{% set _ = parts.append('customer=' ~ customer) %}{% endif -%}
+  {%- if flag %}{% set _ = parts.append('flag=' ~ flag.value) %}{% endif -%}
+  {%- if extra %}{% set _ = parts.append(extra) %}{% endif -%}
+  {{- '/?' ~ parts|join('&') if parts else '/' -}}
+{%- endmacro %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Pipeline</h1>
+  <div class="filters">
+    {% if customer_label %}
+      <a class="chip" href="{{ '/?flag=' ~ flag.value if flag else '/' }}">{{ customer_label }} ×</a>
+    {% endif %}
+    {% if flag_label %}
+      <a class="chip" href="{{ '/?customer=' ~ customer if customer else '/' }}">{{ flag_label }} ×</a>
+    {% endif %}
+  </div>
+  <div class="sorts">
+    <a class="pill {{ 'on' if sort != 'value' }}" href="{{ keep('sort=age') }}">By age</a>
+    <a class="pill {{ 'on' if sort == 'value' }}" href="{{ keep('sort=value') }}">By value</a>
+  </div>
+</header>
+
+{% include "partials/metric_strip.html" %}
+
+{% if columns|sum(attribute='count') == 0 and not customer and not flag %}
+  <p class="notice">
+    Nothing has been processed yet. Run <code>python -m scripts.bootstrap</code> to
+    load the catalogue and put slips through the engine.
+  </p>
+{% else %}
+  <div class="board">
+    {% for column in columns %}
+      <section class="column">
+        <header class="column-head">
+          <h2>{{ column.title }}</h2>
+          <span class="count">{{ column.count }}</span>
+        </header>
+
+        {% for card in column.cards %}
+          {% include "partials/card.html" %}
+        {% else %}
+          <p class="column-empty">{{ empty_line[column.status.value] }}</p>
+        {% endfor %}
+
+        {% if column.truncated %}
+          {% if column.status.value == 'approved' %}
+            <a class="column-more" href="/approved">All {{ column.count }} approved →</a>
+          {% else %}
+            <p class="column-more">
+              Showing {{ column.cards|length }} of {{ column.count }}. Sort or
+              pick a customer to bring the rest into view.
+            </p>
+          {% endif %}
+        {% endif %}
+      </section>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

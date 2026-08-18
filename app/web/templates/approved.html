@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Approved — 3P{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Approved</h1>
+  <form class="search" method="get" action="/approved">
+    <input type="search" name="q" value="{{ query }}" placeholder="Slip number or customer">
+    <button type="submit">Search</button>
+  </form>
+</header>
+
+<table class="archive">
+  <thead>
+    <tr>
+      <th>Slip</th>
+      <th>Customer</th>
+      <th>Contract</th>
+      <th>Service date</th>
+      <th class="num">Lines</th>
+      <th class="num">Total</th>
+      <th>Approved by</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for card in cards %}
+      <tr>
+        <td><a href="/slips/{{ card.draft.id }}">{{ card.slip_no }}</a></td>
+        <td>{{ card.customer }}</td>
+        <td class="meta">{{ card.contract_code or '—' }}</td>
+        <td class="meta">{{ card.service_date|day }}</td>
+        <td class="num">{{ card.line_count }}</td>
+        <td class="num amount">{{ currency }} {{ card.confirmed|money }}</td>
+        <td class="meta">{{ card.draft.resolved_by or '—' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="column-empty">
+        {{ 'Nothing matches that search.' if query else 'No progress payment has been approved yet.' }}
+      </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

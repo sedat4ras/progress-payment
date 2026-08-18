@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests -q
+
+  pricing-safety:
+    # Fails the build if any change starts pricing lines against the wrong
+    # contract item. Those are the only errors no human would ever catch.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate the synthetic dataset
+        run: python -m data.generate
+
+      - name: Score the engine
+        env:
+          PP_MATCHER_BACKEND: rules
+        run: python -m scripts.evaluate
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t progress-payment:ci .
+
+      - name: Boot it and check every screen answers
+        # The container bootstraps its own dataset, so a 200 on the board is a
+        # real end-to-end signal: data generated, pipeline run, board rendered.
+        run: |
+          docker run -d --name pp -p 8000:8000 progress-payment:ci
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:8000/ && break
+            sleep 2
+          done
+          for path in / /invalid /approved; do
+            if ! curl -sf -o /dev/null "http://localhost:8000$path"; then
+              echo "$path did not answer"; docker logs pp; docker rm -f pp; exit 1
+            fi
+          done
+          echo "healthy"; docker rm -f pp

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Invalid — 3P{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Invalid</h1>
+</header>
+
+<p class="lede">
+  These slips never entered the pipeline, so nothing on them was matched or
+  priced. They are fixed in the master data — a missing customer, a contract
+  that was not in force on the service date — and then reprocessed.
+</p>
+
+<section class="stack">
+  {% for draft, reasons in slips %}
+    <article class="panel invalid-row">
+      <div class="invalid-head">
+        <a class="slip-no" href="/slips/{{ draft.id }}">{{ draft.slip.slip_no }}</a>
+        <span class="meta">{{ draft.slip.customer_code }}</span>
+        <span class="meta">{{ draft.slip.service_date|day }}</span>
+        <span class="meta">{{ draft.slip.technician }}</span>
+        <span class="tag tag-invalid">{{ draft.status|status }}</span>
+      </div>
+      <ul class="reasons">
+        {% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}
+      </ul>
+      <form method="post" action="/slips/{{ draft.id }}/reprocess">
+        <button type="submit" class="secondary">Reprocess</button>
+      </form>
+    </article>
+  {% else %}
+    <p class="column-empty">No slip has failed validation.</p>
+  {% endfor %}
+</section>
+{% endblock %}
