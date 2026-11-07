@@ -1,6 +1,6 @@
 # Project: Progress Payment — 3P
 
-> Turning field service slips into contract-priced progress payments — with a local language model that reads, and a deterministic engine that prices.
+> Turning field service slips into contract-priced progress payments, with a local language model that reads and a deterministic engine that prices.
 
 [![CI](https://github.com/sedat4ras/progress-payment/actions/workflows/ci.yml/badge.svg)](https://github.com/sedat4ras/progress-payment/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
@@ -14,7 +14,7 @@
 ## The problem
 
 A facilities company serves dozens of corporate customers. Each customer has a
-**contract price list** that is renegotiated every period — the same air
+**contract price list** that is renegotiated every period: the same air
 conditioner filter costs a different amount at the hospital than at the
 shopping mall, and a different amount again in the second half of the year.
 
@@ -41,7 +41,7 @@ automates the lookup without letting a model anywhere near the arithmetic.
 A model that hallucinates a *price* produces a wrong invoice that nobody
 notices. A model that hallucinates an *item code* is caught immediately,
 because the code is validated against a closed list before anything is priced.
-So the model is only ever allowed to make the second kind of mistake — and it
+So the model is only ever allowed to make the second kind of mistake, and it
 is never shown a price in the first place ([`prompt.py`](app/engine/backends/prompt.py),
 [`test_backends.py`](tests/test_backends.py)).
 
@@ -107,9 +107,8 @@ seeded aliases are catalogue synonyms and stay; learned ones are gone.
 **Every line stays actionable, including the ones the machine was sure about.**
 A confidently priced line the expert has to change is the only failure mode
 that can reach a customer unnoticed, so the interface keeps a correction
-affordance on it and records both readings — what the machine said, what the
-human said. That is what makes the silent-error number below measurable rather
-than asserted.
+affordance on it and records both readings: what the machine said and what the
+human said. That record is how the silent-error number below gets measured.
 
 ## Results
 
@@ -131,7 +130,7 @@ contractual ceiling, unknown customers and out-of-period dates.
 | Lines queued that were actually correct | 94 | 51 |
 
 The model's contribution is measurable and bounded: it moved 43 lines off the
-expert's desk and mispriced none of them. It could not have done otherwise —
+expert's desk and mispriced none of them. It could not have done otherwise:
 it never saw a price, and every code it returned was checked against the
 contract before any of them were priced.
 
@@ -142,14 +141,14 @@ looks at. **CI fails the build if it is not zero**
 
 Everything else is a workload trade-off. Lowering `PP_AUTO_APPROVE_THRESHOLD`
 automates more lines and puts more wrong ones through; raising it does the
-opposite. The default of `0.85` was chosen by measuring, not guessing.
+opposite. The default of `0.85` was chosen by measurement.
 
 <details>
 <summary>Why the fuzzy matcher scores twice</summary>
 
 The first version used RapidFuzz `WRatio` for both retrieval and confidence,
 and it silently mispriced 8 lines. `WRatio` rewards partial overlap, so
-`"Industrial Fan Balancing"` — work that is not in the contract at all —
+`"Industrial Fan Balancing"`, work that is not in the contract at all,
 scored 90% against `"Fan Motor 1/4 HP"` on the shared word *Fan*, cleared
 the threshold and got a price.
 
@@ -177,7 +176,7 @@ a human no matter how high the raw confidence was.
 
 The dataset carries 12 lines whose wording genuinely cannot settle the
 question. All 12 are held on both backends. Set the margin to `0` and three of
-them get priced — one at 0.851 confidence, just over the auto-approve
+them get priced, one at 0.851 confidence, just over the auto-approve
 threshold. That is the number that earns the guard its place.
 
 </details>
@@ -186,10 +185,10 @@ threshold. That is the number that earns the guard its place.
 
 Server-rendered FastAPI + Jinja2, hand-written CSS, one small script, no build
 step. Five surfaces: a pipeline board, a slip detail, invalid slips, the
-approved archive, and administration (named as out of scope rather than
-missing — see [`docs/ui-spec.md`](docs/ui-spec.md) §10).
+approved archive, and administration (named as out of scope;
+see [`docs/ui-spec.md`](docs/ui-spec.md) §10).
 
-**The board** is four columns — needs review, ready, manual, approved — under
+**The board** is four columns (needs review, ready, manual, approved) under
 one metric strip. The two metrics next to each other are the automation rate
 and the silent-error count, on purpose: neither is honest alone, because
 automation is trivially inflated by lowering the threshold and the second
@@ -224,8 +223,8 @@ depends on it.
 
 ## Pluggable inference
 
-The model backend is a seam, not a dependency. All three implement the same
-protocol and answer the same narrow question — *which of these contract items
+The model backend is swappable. All three implement the same
+protocol and answer the same narrow question: *which of these contract items
 is this line?*
 
 | Backend | Use | Requires |
@@ -242,8 +241,8 @@ PP_MATCHER_BACKEND=ollama  python -m scripts.evaluate
 Switching is one environment variable. No application code changes, because no
 application code knows which one is running. If the configured backend is not
 reachable, [`get_backend`](app/engine/backends/__init__.py) falls back to
-`rules` — an unavailable model degrades the automation rate, never the
-correctness of a price.
+`rules`, so an unavailable model lowers the automation rate and leaves the
+correctness of a price untouched.
 
 ## Running it
 
@@ -273,7 +272,7 @@ docker build -t progress-payment .
 docker run -p 8000:8000 -v progress-payment-data:/data progress-payment
 ```
 
-The image ships without a model on purpose — it runs the full pipeline on
+The image ships without a model on purpose: it runs the full pipeline on
 `rules` alone. Point `PP_OLLAMA_HOST` at a host running Ollama to add the
 semantic layer. Nothing is fetched at runtime either: the interface is one
 stylesheet and one script served from the image, so the container works with
@@ -305,7 +304,7 @@ python -m pytest tests -q
 network, so the whole pipeline is verifiable with no model installed. It covers
 the arithmetic, the validation gate, every route into and out of the review
 queue, the category guards, the rule that a correction stays local to its line,
-and the limits on what a model is allowed to influence — including the case
+and the limits on what a model is allowed to influence, including the case
 where a model returns an item code that does not exist.
 
 ## Synthetic data
@@ -322,8 +321,8 @@ product:
 
 - **The web tier is single-tenant.** There is no user model: the reviewer is a
   name in the sidebar, not an account, so there is no authentication, no
-  locking and no audit of who changed what. The seam is clean — every write
-  already goes through the pipeline rather than the templates — but a real
+  locking and no audit of who changed what. The seam is clean, since every write
+  already goes through the pipeline rather than the templates, but a real
   deployment has to add it.
 - **Master data is read-only.** Customers, contracts and the price list arrive
   from `data/`; an invalid slip is fixed there and reprocessed. No
@@ -338,4 +337,4 @@ product:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
